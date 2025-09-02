@@ -1816,6 +1816,9 @@ dependencies = [
 name = "turbinetest"
 version = "0.1.0"
 dependencies = [
+ "bs58",
+ "serde",
+ "serde_json",
  "solana-sdk",
 ]
 
