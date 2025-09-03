@@ -1,0 +1,3 @@
+pub fn submit_proof() {
+    println!("Submit proof works!");
+}

@@ -1,3 +1,5 @@
+pub mod submit;
+
 #[cfg(test)]
 mod tests {
     use solana_sdk::{
@@ -11,6 +13,8 @@ mod tests {
     use solana_sdk::pubkey::Pubkey;
     use std::str::FromStr;
     use solana_sdk::hash::hash;
+    
+
    
 
 
@@ -136,7 +140,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn submit_proof_test() {
+        crate::submit::submit_proof();
+    }
+
+
 
     
 
 }
+
