@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod tests {
     use solana_sdk::{
-    signature::{Keypair, Signer, read_keypair_file},
-    transaction::Transaction,
+      message::Message,
+      signature::{Keypair, Signer, read_keypair_file},
+      transaction::Transaction,
     };
     use bs58;
     use solana_client::rpc_client::RpcClient;
@@ -10,6 +11,7 @@ mod tests {
     use solana_sdk::pubkey::Pubkey;
     use std::str::FromStr;
     use solana_sdk::hash::hash;
+   
 
 
     #[test]
@@ -68,41 +70,73 @@ mod tests {
 
     #[test]
     fn transfer_sol() {
-       // find  wallet 
-       let keypair = read_keypair_file("dev-wallet.json").expect("Couldn't find wallet file");
-       // Generate a signature from the keypair
-       let pubkey = keypair.pubkey();
+        // Load wallet
+        let keypair = read_keypair_file("dev-wallet.json").expect("Couldn't find wallet file");
+        let pubkey = keypair.pubkey();
 
-       let message_bytes = b"I verify my Solana Keypair!";
-       let sig = keypair.sign_message(message_bytes);
-       let sig_hashed = hash(sig.as_ref()); 
+        
+        let message_bytes = b"I verify my Solana Keypair!";
+        let sig = keypair.sign_message(message_bytes);
+        let sig_hashed = hash(sig.as_ref());
 
-       // Verify the signature using the public key
-        match sig.verify(&pubkey.to_bytes(), &sig_hashed.to_bytes()) {
-            true => println!("Signature verified"),
-            false => println!("Verification failed"),
+        // Verify the signature
+        if sig.verify(&pubkey.to_bytes(), &sig_hashed.to_bytes()) {
+            println!("Signature verified");
+        } else {
+            println!("Verification failed");
         }
+
+        // Recipient
         let to_pubkey = Pubkey::from_str("Cf27GhB8m4q1p9RK8e5MYgmuGQZQngbBguAyKJWpTEKZ").unwrap();
+
         // Connect to devnet
         const RPC_URL: &str = "https://api.devnet.solana.com";
+        let rpc_client = RpcClient::new(RPC_URL.to_string());
 
-        let rpc_client = RpcClient::new(RPC_URL);
-        // Fetch recent blockhash
+        // ✅ Fetch recent blockhash
         let recent_blockhash = rpc_client
             .get_latest_blockhash()
             .expect("Failed to get recent blockhash");
-        let transaction = Transaction::new_signed_with_payer(
-        &[transfer(&keypair.pubkey(), &to_pubkey, 1_000_000)],
-        Some(&keypair.pubkey()),
-        &vec![&keypair],
-        recent_blockhash,
+
+        // Check balance
+        let balance = rpc_client
+            .get_balance(&pubkey)
+            .expect("Failed to get balance");
+
+        println!("Current balance: {} lamports", balance);
+
+        // Build a message to calculate fee
+        let message = Message::new_with_blockhash(
+            &[transfer(&pubkey, &to_pubkey, balance)],
+            Some(&pubkey),
+            &recent_blockhash,
         );
+
+        let fee = rpc_client
+            .get_fee_for_message(&message)
+            .expect("Failed to get fee calculator");
+
+        println!("Estimated fee: {} lamports", fee);
+
+        // Transfer (balance - fee) so the account closes cleanly
+        let transaction = Transaction::new_signed_with_payer(
+            &[transfer(&pubkey, &to_pubkey, balance - fee)],
+            Some(&pubkey),
+            &[&keypair],
+            recent_blockhash,
+        );
+
         let signature = rpc_client
             .send_and_confirm_transaction(&transaction)
-            .expect("Failed to send transaction");
+            .expect("Failed to send final transaction");
+
         println!(
-            "Success! Check out your TX here: https://explorer.solana.com/tx/{}/?cluster=devnet",
+            "✅ Success! Entire balance transferred: https://explorer.solana.com/tx/{}/?cluster=devnet",
             signature
         );
     }
+
+
+    
+
 }
